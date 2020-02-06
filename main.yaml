@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Deploy a simple ECS EC2 cluster"
+
+Parameters:
+  S3BucketName:
+    Description: "Name for the S3 bucket where we store the CloudFormation Template"
+    Type: String
+  ClusterName:
+    Description: "ECS Cluster Name"
+    Type: String
+  ServiceName:
+    Description: "ECS Service Name"
+    Type: String
+  TaskDefinitionName:
+    Description: "The the EC2 Task definition"
+    Type: String
+  VpcId:
+    Description: "VPC ID for tr-vpc-1"
+    Type: String
+  SubnetId:
+    Description: "Subnet ID for the EC2 instance"
+    Type: String
+  IAMProfileName:
+    Description: "Name for the IAM profile"
+    Type: String
+  ImageId:
+    Description: "AMI Image ID"
+    Type: String
+  InstanceType:
+    Description: "EC2 Instance Type"
+    Type: String
+
+  # TR required tags
+  Environment:
+    Description: "TR tag for tr:environment-type"
+    Type: String
+  FinancialIdentifier:
+    Description: "TR tag for tr:financial-identifier"
+    Type: String
+  ApplicationAssetInsightId:
+    Description: "TR tag for tr:application-asset-insight-id"
+    Type: String
+  ResourceOwner:
+    Description: "TR tag for tr:resource-owner"
+    Type: String
+
+Resources:
+  Cluster:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      # TemplateURL has to be a S3 URL
+      TemplateURL: !Sub https://s3.amazonaws.com/${S3BucketName}/Cluster.yaml
+      TimeoutInMinutes: '5'
+      Parameters:
+        ClusterName: !Ref ClusterName
+        ServiceName: !Ref ServiceName
+        TaskDefinition: !GetAtt TaskDefinition.Outputs.TaskDefinitionARN
+        IAMProfileName: !Ref IAMProfileName
+        ImageId: !Ref ImageId
+        InstanceType: !Ref InstanceType
+        VpcId: !Ref VpcId
+        SubnetId: !Ref SubnetId
+        Environment: !Ref Environment
+        FinancialIdentifier: !Ref FinancialIdentifier
+        ApplicationAssetInsightId: !Ref ApplicationAssetInsightId
+        ResourceOwner: !Ref ResourceOwner
+      Tags:
+        -
+          Key: "tr:environment-type"
+          Value: !Ref Environment
+        -
+          Key: "tr:financial-identifier"
+          Value: !Ref FinancialIdentifier
+        -
+          Key: "tr:application-asset-insight-id"
+          Value: !Ref ApplicationAssetInsightId
+        -
+          Key: "tr:resource-owner"
+          Value: !Ref ResourceOwner
+
+  TaskDefinition:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      # TemplateURL has to be a S3 URL
+      TemplateURL: !Sub https://s3.amazonaws.com/${S3BucketName}/TaskDefinition.yaml
+      TimeoutInMinutes: '1'
+      Parameters:
+        Name: !Ref TaskDefinitionName
+      Tags:
+        -
+          Key: "tr:environment-type"
+          Value: !Ref Environment
+        -
+          Key: "tr:financial-identifier"
+          Value: !Ref FinancialIdentifier
+        -
+          Key: "tr:application-asset-insight-id"
+          Value: !Ref ApplicationAssetInsightId
+        -
+          Key: "tr:resource-owner"
+          Value: !Ref ResourceOwner
+
+Outputs:
+  ClusterARN:
+    Description: "ARN for the EC2 cluster"
+    Value: !GetAtt Cluster.Outputs.ClusterARN
+  ServiceARN:
+    Description: "ARN for the EC2 service"
+    Value: !GetAtt Cluster.Outputs.ServiceARN
+  EC2InstanceID:
+    Description: "InstanceID for the EC2 instance"
+    Value: !GetAtt Cluster.Outputs.EC2InstanceID
+  PublicIP:
+    Description: "The Public IP for the EC2 instance"
+    Value: !GetAtt Cluster.Outputs.PublicIP

@@ -1,0 +1,166 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Required Infrastructure for setting up EC2 ECS"
+
+Parameters:
+  ClusterName:
+    Description: "ECS Cluster Name"
+    Type: String
+  TaskDefinition:
+    Description: "The name:revision string for the EC2 Task definition"
+    Type: String
+  ServiceName:
+    Description: "ECS Service Name"
+    Type: String
+  IAMProfileName:
+    Description: "Name for the IAM profile"
+    Type: String
+  ImageId:
+    Description: "AMI Image ID"
+    Type: String
+  InstanceType:
+    Description: "EC2 Instance Type"
+    Type: String
+    Default: t2.micro
+  VpcId:
+    Description: "VPC ID for tr-vpc-1"
+    Type: String
+  SubnetId:
+    Description: "Subnet ID for the public subnet"
+    Type: String
+
+  # TR required tags
+  Environment:
+    Description: "TR tag for tr:environment-type"
+    Type: String
+  FinancialIdentifier:
+    Description: "TR tag for tr:financial-identifier"
+    Type: String
+  ApplicationAssetInsightId:
+    Description: "TR tag for tr:application-asset-insight-id"
+    Type: String
+  ResourceOwner:
+    Description: "TR tag for tr:resource-owner"
+    Type: String
+
+
+Resources:
+  ECSSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      VpcId: !Ref VpcId
+      GroupDescription: "Allow HTTP inbound traffic via port 80"
+      SecurityGroupIngress:
+        -
+          IpProtocol: "tcp"
+          FromPort: "80"
+          ToPort: "80"
+          CidrIp: "0.0.0.0/0"
+      Tags:
+        -
+          Key: "tr:environment-type"
+          Value: !Ref Environment
+        -
+          Key: "tr:financial-identifier"
+          Value: !Ref FinancialIdentifier
+        -
+          Key: "tr:application-asset-insight-id"
+          Value: !Ref ApplicationAssetInsightId
+        -
+          Key: "tr:resource-owner"
+          Value: !Ref ResourceOwner
+  ECSCluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: !Ref ClusterName
+
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${IAMProfileName}-role
+      AssumeRolePolicyDocument: |
+        {
+          "Statement": [{
+            "Action": "sts:AssumeRole",
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "ec2.amazonaws.com"
+            }
+          }]
+        }
+      Policies:
+        -
+          PolicyName: !Sub ${IAMProfileName}-policies
+          PolicyDocument: |
+            {
+              "Statement": [{
+                "Effect": "Allow",
+                "Action": [
+                  "ecs:*",
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents",
+                  "ecr:*"
+                ],
+                "Resource": "*"
+              }]
+            }
+
+  ECSInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Ref IAMProfileName
+      Roles:
+        - !Ref ECSRole
+
+  EC2Instance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      IamInstanceProfile: !Ref ECSInstanceProfile
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !GetAtt ECSSecurityGroup.GroupId
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
+          # For bastion 2.0 support
+          adduser a${ApplicationAssetInsightId}-PowerUser2
+          usermod -aG docker a${ApplicationAssetInsightId}-PowerUser2
+      Tags:
+        -
+          Key: "tr:environment-type"
+          Value: !Ref Environment
+        -
+          Key: "tr:financial-identifier"
+          Value: !Ref FinancialIdentifier
+        -
+          Key: "tr:application-asset-insight-id"
+          Value: !Ref ApplicationAssetInsightId
+        -
+          Key: "tr:resource-owner"
+          Value: !Ref ResourceOwner
+
+  ECSService:
+    Type: "AWS::ECS::Service"
+    DependsOn: EC2Instance
+    Properties:
+      Cluster: !Ref ECSCluster
+      ServiceName: !Ref ServiceName
+      TaskDefinition: !Ref TaskDefinition
+      LaunchType: "EC2"
+      DesiredCount: 1
+
+Outputs:
+  ClusterARN:
+    Description: "ARN for the EC2 cluster"
+    Value: !GetAtt ECSCluster.Arn
+  ServiceARN:
+    Description: "ARN for the EC2 service"
+    Value: !Ref ECSService
+  EC2InstanceID:
+    Description: "InstanceID for the EC2 instance"
+    Value: !Ref EC2Instance
+  PublicIP:
+    Description: "The Public IP for the EC2 instance"
+    Value: !GetAtt EC2Instance.PublicIp

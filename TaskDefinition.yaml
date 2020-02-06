@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Task Definition to be used for setup a simple ECS EC2 cluster"
+
+Parameters:
+  Name:
+    Description: "Name for the EC2 task definition"
+    Type: String
+
+Resources:
+  TaskDefinition:
+    Type: "AWS::ECS::TaskDefinition"
+    Properties:
+      Family: !Ref Name
+      RequiresCompatibilities:
+        - "EC2"
+      NetworkMode: "bridge"
+
+      ContainerDefinitions:
+        -
+          # This is a simple example. More options can be found:
+          #   https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definitions
+          Name: !Sub ${Name}-nginx-cd
+          Image: "nginx:1.13.8-alpine"
+          Cpu: "256"
+          Memory: "512"
+          PortMappings:
+            -
+              ContainerPort: 80
+              HostPort: 80
+
+Outputs:
+  TaskDefinitionARN:
+    Description: "ARN for the EC2 task definition"
+    Value: !Ref TaskDefinition

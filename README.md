@@ -62,7 +62,6 @@ VPC_ID=<YOUR_VPC_ID>                            # VPC ID for tr-vpc-1
 SUBNET_ID=<PUBLIC_SUBNET_ID>                    # Public subnet ID for tr-vpc-1
 ```
 
-** *Important* **: For naming conventions, please refer [TR Naming Scheme](https://thehub.thomsonreuters.com/docs/DOC-2129127).
 
 ### Execute the script
 
